@@ -1,0 +1,80 @@
+import React, { Component } from 'react';
+import { View, Text, Button } from 'react-native';
+import NfcManager, { NfcTech } from 'react-native-nfc-manager';
+
+class NFCConnection extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      nfcSupported: false,
+      nfcEnabled: false,
+      connected: false,
+      nfcMessage: '',
+    };
+  }
+
+  async componentDidMount() {
+    await NfcManager.start();
+    this.checkNFCStatus();
+  }
+
+  async componentWillUnmount() {
+    await NfcManager.stop();
+  }
+
+  async checkNFCStatus() {
+    const nfcSupported = await NfcManager.isSupported();
+    const nfcEnabled = await NfcManager.isEnabled();
+
+    this.setState({ nfcSupported, nfcEnabled });
+  }
+
+  handleNFCRead = async (tech) => {
+    if (tech === NfcTech.Ndef) {
+      try {
+        const tag = await NfcManager.requestTechnology(tech);
+        if (tag) {
+          const ndef = await NfcManager.getNdefMessage();
+          if (ndef) {
+            
+            this.setState({ nfcMessage: ndef[0].payload });
+          }
+          NfcManager.setAlertMessage('NFC connected');
+          NfcManager.requestTechnology(NfcTech.Ndef);
+        }
+      } catch (ex) {
+        console.warn(ex);
+      } finally {
+        NfcManager.releaseTechnology();
+      }
+    }
+  };
+
+  render() {
+    const { nfcSupported, nfcEnabled, connected, nfcMessage } = this.state;
+
+    return (
+      <View>
+        <Text>NFC Supported: {nfcSupported ? 'Yes' : 'No'}</Text>
+        <Text>NFC Enabled: {nfcEnabled ? 'Yes' : 'No'}</Text>
+        {nfcSupported && nfcEnabled ? (
+          connected ? (
+            <Text>Connected to NFC device</Text>
+          ) : (
+            <>
+              <Button
+                title="Connect to NFC Device"
+                onPress={() => this.handleNFCRead(NfcTech.Ndef)}
+              />
+              {nfcMessage && <Text>NFC Message: {nfcMessage}</Text>}
+            </>
+          )
+        ) : (
+          <Text>NFC is not supported or enabled</Text>
+        )}
+      </View>
+    );
+  }
+}
+
+export default NFCConnection;
